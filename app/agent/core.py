@@ -67,7 +67,7 @@ def create_conversation(tenant_id: str, user_id: str, title: str = "Nueva conver
             "tenant_id": tenant_id,
             "user_id": user_id,
             "title": title,
-            "context_type": "trafiker",
+            "context_type": "general",
         })
         .execute()
     )

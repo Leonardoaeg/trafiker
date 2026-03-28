@@ -34,7 +34,7 @@ def list_conversations(tenant_id: str):
             db.table("ai_conversations")
             .select("id, title, created_at")
             .eq("tenant_id", tenant_id)
-            .eq("context_type", "trafiker")
+            .eq("context_type", "general")
             .order("created_at", desc=True)
             .limit(50)
             .execute()
