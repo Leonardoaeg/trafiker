@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import agent, campaigns, metrics, alerts, training, v1_ai
+from app.routers import agent, campaigns, metrics, alerts, training, v1_ai, meta
 from app.scheduler.jobs import start_scheduler, stop_scheduler
 
 
@@ -31,11 +31,12 @@ app.add_middleware(
 )
 
 app.include_router(agent.router, prefix="/agent", tags=["Agente"])
-app.include_router(campaigns.router, prefix="/campaigns", tags=["Campañas"])
-app.include_router(metrics.router, prefix="/metrics", tags=["Métricas"])
-app.include_router(alerts.router, prefix="/alerts", tags=["Alertas"])
+app.include_router(campaigns.router, prefix="/v1/campaigns", tags=["Campañas"])
+app.include_router(metrics.router, prefix="/v1/metrics", tags=["Métricas"])
+app.include_router(alerts.router, prefix="/alerts", tags=["Alertas"])  # proxied from Next.js
 app.include_router(training.router, prefix="/training", tags=["Entrenamiento"])
 app.include_router(v1_ai.router, prefix="/v1/ai", tags=["v1 AI"])
+app.include_router(meta.router, prefix="/v1/meta", tags=["Meta OAuth"])
 
 
 @app.get("/", tags=["Health"])

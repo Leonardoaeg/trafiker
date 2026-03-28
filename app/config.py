@@ -9,9 +9,10 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_service_key: str
 
-    # Meta Ads (opcional en esta fase)
+    # Meta Ads
     meta_app_id: str = ""
     meta_app_secret: str = ""
+    meta_redirect_uri: str = "https://agenteflow.online/api/meta/callback"
 
     # General
     environment: str = "production"
