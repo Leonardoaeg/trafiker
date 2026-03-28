@@ -1,9 +1,10 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.config import settings
 from app.supabase.client import get_supabase
 from app.agent.prompts import build_system_prompt
 
-genai.configure(api_key=settings.gemini_api_key)
+_client = genai.Client(api_key=settings.gemini_api_key)
 
 
 def get_training_context(tenant_id: str) -> str:
@@ -128,15 +129,24 @@ def chat(
     save_message(conversation_id, "user", message)
 
     # 5. Llamar a Gemini con historial
-    model_name = config.get("model", "gemini-1.5-flash")
+    model_name = config.get("model", "gemini-2.0-flash")
     if not model_name.startswith("gemini"):
-        model_name = "gemini-1.5-flash"
-    model = genai.GenerativeModel(
-        model_name=model_name,
-        system_instruction=system_prompt,
+        model_name = "gemini-2.0-flash"
+
+    contents = []
+    for msg in gemini_history:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append(types.Content(role=role, parts=[types.Part(text=msg["parts"][0])]))
+    contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
+
+    response = _client.models.generate_content(
+        model=model_name,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            max_output_tokens=config.get("max_tokens", 4096),
+        ),
     )
-    chat_session = model.start_chat(history=gemini_history)
-    response = chat_session.send_message(message)
 
     assistant_message = response.text
     tokens_used = response.usage_metadata.total_token_count if response.usage_metadata else 0
