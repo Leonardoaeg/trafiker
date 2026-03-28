@@ -45,4 +45,4 @@ def root():
 
 @app.get("/health", tags=["Health"])
 def health():
-    return {"status": "healthy", "version": "1.1.0"}
+    return {"status": "healthy", "version": "1.2.0", "sdk": "google-genai"}
