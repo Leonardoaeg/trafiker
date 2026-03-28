@@ -1,0 +1,10 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+google-generativeai==0.8.3
+supabase==2.7.4
+facebook-business==20.0.3
+apscheduler==3.10.4
+python-dotenv==1.0.1
+httpx==0.27.2
+pydantic==2.8.2
+pydantic-settings==2.4.0
