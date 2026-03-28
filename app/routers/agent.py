@@ -56,4 +56,4 @@ def get_messages(tenant_id: str, conversation_id: str):
 
 @router.get("/status")
 def agent_status():
-    return {"status": "Trafiker activo", "model": "gemini-2.5-flash"}
+    return {"status": "Trafiker activo", "model": "gemini-1.5-flash"}

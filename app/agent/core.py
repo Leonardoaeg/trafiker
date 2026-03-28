@@ -37,7 +37,7 @@ def get_assistant_config(tenant_id: str) -> dict:
     except Exception:
         pass
     return {
-        "model": "gemini-2.5-flash-preview-04-17",
+        "model": "gemini-1.5-flash",
         "max_tokens": 4096,
     }
 
@@ -128,9 +128,9 @@ def chat(
     save_message(conversation_id, "user", message)
 
     # 5. Llamar a Gemini con historial
-    model_name = config.get("model", "gemini-2.5-flash-preview-04-17")
+    model_name = config.get("model", "gemini-1.5-flash")
     if not model_name.startswith("gemini"):
-        model_name = "gemini-2.5-flash-preview-04-17"
+        model_name = "gemini-1.5-flash"
     model = genai.GenerativeModel(
         model_name=model_name,
         system_instruction=system_prompt,
