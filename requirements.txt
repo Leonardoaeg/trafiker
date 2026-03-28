@@ -1,6 +1,6 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-google-genai==1.10.0
+google-genai==1.9.0
 supabase==2.7.4
 facebook-business==20.0.3
 apscheduler==3.10.4
