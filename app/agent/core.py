@@ -1,10 +1,34 @@
-from google import genai
-from google.genai import types
+import requests
 from app.config import settings
 from app.supabase.client import get_supabase
 from app.agent.prompts import build_system_prompt
 
-_client = genai.Client(api_key=settings.gemini_api_key)
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_MODEL = "gemini-2.0-flash"
+
+
+def _call_gemini(system_prompt: str, history: list[dict], message: str, max_tokens: int = 4096) -> tuple[str, int]:
+    """Llama a la API de Gemini directamente via REST."""
+    contents = []
+    for msg in history:
+        role = "model" if msg["role"] == "assistant" else "user"
+        contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+    contents.append({"role": "user", "parts": [{"text": message}]})
+
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": max_tokens},
+    }
+
+    url = GEMINI_API_URL.format(model=GEMINI_MODEL)
+    resp = requests.post(url, params={"key": settings.gemini_api_key}, json=payload, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+
+    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    tokens = data.get("usageMetadata", {}).get("totalTokenCount", 0)
+    return text, tokens
 
 
 def get_training_context(tenant_id: str) -> str:
@@ -37,10 +61,7 @@ def get_assistant_config(tenant_id: str) -> dict:
             return result.data[0]
     except Exception:
         pass
-    return {
-        "model": "gemini-1.5-flash",
-        "max_tokens": 4096,
-    }
+    return {"max_tokens": 4096}
 
 
 def get_conversation_history(conversation_id: str) -> list[dict]:
@@ -86,15 +107,6 @@ def save_message(conversation_id: str, role: str, content: str, tokens: int = 0)
     }).execute()
 
 
-def _to_gemini_history(messages: list[dict]) -> list[dict]:
-    """Convierte historial de Supabase al formato que espera Gemini."""
-    history = []
-    for msg in messages:
-        role = "model" if msg["role"] == "assistant" else "user"
-        history.append({"role": role, "parts": [msg["content"]]})
-    return history
-
-
 def chat(
     tenant_id: str,
     user_id: str,
@@ -102,10 +114,7 @@ def chat(
     conversation_id: str | None = None,
     campaign_context: dict | None = None,
 ) -> dict:
-    """
-    Envía un mensaje al agente Trafiker y retorna la respuesta.
-    Gestiona el historial de conversación en Supabase.
-    """
+    """Envía un mensaje al agente Trafiker y retorna la respuesta."""
     # 1. Obtener o crear conversación
     if not conversation_id:
         title = message[:60] + "..." if len(message) > 60 else message
@@ -121,37 +130,21 @@ def chat(
 
     system_prompt = build_system_prompt(client_context, training_context)
 
-    # 3. Cargar historial y construir sesión de chat
+    # 3. Cargar historial
     history = get_conversation_history(conversation_id)
-    gemini_history = _to_gemini_history(history)
 
     # 4. Guardar mensaje del usuario
     save_message(conversation_id, "user", message)
 
-    # 5. Llamar a Gemini con historial
-    model_name = config.get("model", "gemini-2.0-flash")
-    if not model_name.startswith("gemini"):
-        model_name = "gemini-2.0-flash"
-
-    contents = []
-    for msg in gemini_history:
-        role = "user" if msg["role"] == "user" else "model"
-        contents.append(types.Content(role=role, parts=[types.Part(text=msg["parts"][0])]))
-    contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
-
-    response = _client.models.generate_content(
-        model=model_name,
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            max_output_tokens=config.get("max_tokens", 4096),
-        ),
+    # 5. Llamar a Gemini
+    assistant_message, tokens_used = _call_gemini(
+        system_prompt=system_prompt,
+        history=history,
+        message=message,
+        max_tokens=config.get("max_tokens", 4096),
     )
 
-    assistant_message = response.text
-    tokens_used = response.usage_metadata.total_token_count if response.usage_metadata else 0
-
-    # 6. Guardar respuesta del agente
+    # 6. Guardar respuesta
     save_message(conversation_id, "assistant", assistant_message, tokens_used)
 
     return {
