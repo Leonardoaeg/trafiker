@@ -110,8 +110,75 @@ def list_campaigns(
     return all_campaigns
 
 
+class CreateCampaign(BaseModel):
+    name: str
+    objective: str        # CONVERSIONS | REACH | LEAD_GENERATION | BRAND_AWARENESS | TRAFFIC
+    daily_budget: float   # en USD
+    status: str = "PAUSED"  # ACTIVE | PAUSED
+    account_id: str | None = None  # Supabase UUID de meta_accounts (opcional)
+
+
 class StatusUpdate(BaseModel):
     status: str  # ACTIVE | PAUSED
+
+
+@router.post("/")
+def create_campaign(
+    body: CreateCampaign,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Create a new campaign in Meta Ads via the API.
+    Uses the first active account of the user, or the specified account_id.
+    """
+    user_id = _extract_user_id(authorization)
+    accounts = _get_user_accounts(user_id, body.account_id)
+
+    if not accounts:
+        raise HTTPException(status_code=404, detail="No hay cuentas de Meta conectadas")
+
+    account = accounts[0]
+    daily_budget_cents = int(body.daily_budget * 100)
+
+    resp = httpx.post(
+        f"{GRAPH_BASE}/{account['meta_ad_account_id']}/campaigns",
+        params={"access_token": account["access_token"]},
+        json={
+            "name": body.name,
+            "objective": body.objective,
+            "status": body.status,
+            "special_ad_categories": [],
+            "daily_budget": daily_budget_cents,
+        },
+        timeout=15,
+    )
+
+    if resp.status_code not in (200, 201):
+        detail = resp.json().get("error", {}).get("message", "Error al crear la campaña en Meta")
+        raise HTTPException(status_code=400, detail=detail)
+
+    campaign_id = resp.json().get("id")
+
+    # Fetch created campaign details
+    detail_resp = httpx.get(
+        f"{GRAPH_BASE}/{campaign_id}",
+        params={"access_token": account["access_token"], "fields": CAMPAIGN_FIELDS},
+        timeout=10,
+    )
+    c = detail_resp.json() if detail_resp.status_code == 200 else {}
+
+    return {
+        "id": campaign_id,
+        "meta_account_id": account["id"],
+        "meta_campaign_id": campaign_id,
+        "name": c.get("name", body.name),
+        "status": c.get("status", body.status),
+        "objective": c.get("objective", body.objective),
+        "daily_budget": int(c["daily_budget"]) / 100 if c.get("daily_budget") else body.daily_budget,
+        "lifetime_budget": None,
+        "start_time": c.get("start_time"),
+        "stop_time": c.get("stop_time"),
+    }
 
 
 @router.patch("/{campaign_id}/status")
