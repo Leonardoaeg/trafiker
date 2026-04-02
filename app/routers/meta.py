@@ -184,18 +184,17 @@ def connect_meta_account(
         db.table("meta_accounts")
         .upsert(
             {
-                "user_id": user_id,
+                "tenant_id": user_id,
                 "meta_user_id": meta_user_id,
                 "meta_ad_account_id": ad_account_id,
                 "name": account_name,
                 "currency": currency,
                 "timezone": timezone_name,
-                "access_token": long_token,
+                "access_token_encrypted": long_token,
                 "token_expires_at": expires_at.isoformat(),
                 "status": "active",
-                "connected_at": datetime.now(timezone.utc).isoformat(),
             },
-            on_conflict="user_id,meta_ad_account_id",
+            on_conflict="tenant_id,meta_ad_account_id",
         )
         .execute()
     )
@@ -222,9 +221,9 @@ def list_accounts(authorization: str | None = Header(default=None)):
     db = get_supabase()
     result = (
         db.table("meta_accounts")
-        .select("id,meta_ad_account_id,name,currency,timezone,status,last_synced_at,connected_at")
-        .eq("user_id", user_id)
-        .order("connected_at", desc=True)
+        .select("id,meta_ad_account_id,name,currency,timezone,status,last_synced_at,created_at")
+        .eq("tenant_id", user_id)
+        .order("created_at", desc=True)
         .execute()
     )
     return result.data
@@ -235,7 +234,7 @@ def disconnect_account(account_id: str, authorization: str | None = Header(defau
     """Remove a connected Meta account (only the owner can do this)."""
     user_id = _extract_user_id(authorization)
     db = get_supabase()
-    db.table("meta_accounts").delete().eq("id", account_id).eq("user_id", user_id).execute()
+    db.table("meta_accounts").delete().eq("id", account_id).eq("tenant_id", user_id).execute()
 
 
 @router.post("/accounts/{account_id}/sync")
@@ -247,7 +246,7 @@ def sync_account(account_id: str, authorization: str | None = Header(default=Non
         db.table("meta_accounts")
         .update({"last_synced_at": datetime.now(timezone.utc).isoformat()})
         .eq("id", account_id)
-        .eq("user_id", user_id)
+        .eq("tenant_id", user_id)
         .execute()
     )
     if not result.data:
